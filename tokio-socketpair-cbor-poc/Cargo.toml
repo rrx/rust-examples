@@ -1,0 +1,17 @@
+[package]
+name = "test3"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+socketpair = { version = "0.13", features = ["use_tokio"] }
+failure = "*"
+mio = { version = "0.8", features = ["os-poll", "net", "os-ext"] }
+tokio = { version = "1.15.0", features = ["full"] }
+tokio-serde = { version = "0.8", features = ["cbor"] }
+tokio-util = { version = "0.6.9", features = ["full"] }
+futures = "0.3"
+serde = { version = "1", features = ["derive"] }
+

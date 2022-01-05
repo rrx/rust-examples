@@ -93,7 +93,7 @@ impl PtyFd {
         let mut std = unsafe {std::os::unix::net::UnixStream::from_raw_fd(fd.as_raw_fd()) };
 
         // make sure we are blocking, or pty won't work
-        // applications assume blocking
+        // applications assume blocking, or you will get a Resource Not Available error
         std.set_nonblocking(false)?;
 
         let mut stream = tokio::net::UnixStream::from_std(std)?;
@@ -105,7 +105,7 @@ impl PtyFd {
         let mut std = unsafe {std::os::unix::net::UnixStream::from_raw_fd(raw_fd)};
 
         // make sure we are blocking, or pty won't work
-        // applications assume blocking
+        // applications assume blocking, or you will get a Resource Not Available error
         std.set_nonblocking(false)?;
 
         let mut stream = tokio::net::UnixStream::from_std(std)?;
@@ -131,7 +131,7 @@ impl PtyFd {
 
                     // Establish ourselves as a session leader.
                     if libc::setsid() == -1 {
-                        log::error!("Unable to set SID");
+                        log::error!("Unable to set SID: {:?}", io::Error::last_os_error());
                         return Err(io::Error::last_os_error());
                     }
 
@@ -146,7 +146,7 @@ impl PtyFd {
                         // SIGWINCH won't happen when we resize the
                         // terminal, among other undesirable effects.
                         if libc::ioctl(0, libc::TIOCSCTTY as _, 0) == -1 {
-                            log::error!("Unable to set TTY");
+                            log::error!("Unable to set TTY: {:?}", io::Error::last_os_error());
                             return Err(io::Error::last_os_error());
                         }
                     }
@@ -236,19 +236,13 @@ impl AsyncWrite for PtyFd {
 fn cloexec(fd: RawFd) -> Result<(), io::Error> {
     let flags = unsafe { libc::fcntl(fd, libc::F_GETFD) };
     if flags == -1 {
+        log::error!( "fcntl to read flags failed: {:?}", io::Error::last_os_error());
         return Err(io::Error::last_os_error());
-        //bail!(
-            //"fcntl to read flags failed: {:?}",
-            //io::Error::last_os_error()
-        //);
     }
     let result = unsafe { libc::fcntl(fd, libc::F_SETFD, flags | libc::FD_CLOEXEC) };
     if result == -1 {
+        log::error!("fcntl to set CLOEXEC failed: {:?}", io::Error::last_os_error());
         return Err(io::Error::last_os_error());
-        //bail!(
-            //"fcntl to set CLOEXEC failed: {:?}",
-            //io::Error::last_os_error()
-        //);
     }
     Ok(())
 }
@@ -276,7 +270,10 @@ pub fn openpty(size: PtySize) -> Result<(UnixMasterPty, UnixSlavePty), failure::
         )
     };
 
+    log::info!("open: {:?}", (master, slave));
+
     if result != 0 {
+        log::error!("Failed to openpty: {:?}", io::Error::last_os_error());
         return Err(io::Error::last_os_error().into());
         //bail!("failed to openpty: {:?}", io::Error::last_os_error());
     }

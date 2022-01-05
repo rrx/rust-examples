@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+bytes = "1.1"
 #portable-pty = { git = "https://github.com/wez/wezterm.git", branch = "main", package = "portable-pty" }
 filedescriptor = { git = "https://github.com/wez/wezterm.git", branch = "main", package = "filedescriptor" }
 failure = "0.1"
@@ -22,3 +23,4 @@ rustix = "0.31.0"
 socketpair = { version = "0.13", features = ["use_tokio"] }
 env_logger = { version = "0.9" }
 log = "0.4"
+os_pipe = "1.0"

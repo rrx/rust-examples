@@ -23,11 +23,14 @@ async fn test1() -> Result<(), failure::Error> {
     let (master, slave) = openpty(PtySize::default())?;
 
     // these need to stick around for some reason
-    let mut reader1 = PtyFd::from_fd(master.fd.try_clone()?)?;
+    //let mut reader1 = PtyFd::from_fd(master.fd.try_clone()?)?;
     //let mut reader2 = PtyFd::from_fd(slave.fd.try_clone()?)?;
 
     let mut argv = std::env::args().collect::<Vec<_>>();
     let mut part1 = argv.split_off(1);
+    if part1.len() == 0 {
+        return Ok(());//Err("No params");
+    }
     let args = part1.split_off(1);
     let cmd = part1.get(0).unwrap();
     log::info!("{:?}", (&cmd,&args));
@@ -38,7 +41,12 @@ async fn test1() -> Result<(), failure::Error> {
 
     let (mut stdout_a, stdout_b) = socketpair::tokio_socketpair_stream().await?;
     let (stderr_a, stderr_b) = socketpair::tokio_socketpair_stream().await?;
-    let (stdin_a, stdin_b) = socketpair::tokio_socketpair_stream().await?;
+    //let (stdin_a, stdin_b) = socketpair::tokio_socketpair_stream().await?;
+    //let (stdin_a, stdin_b) = tokio::io::duplex(100);
+    //let (stdin_a, stdin_b) = std::os::unix::net::UnixStream::pair()?;
+    //stdin_a.set_nonblocking(false);
+    //stdin_b.set_nonblocking(false);
+    let (stdin_a, stdin_b) = os_pipe::pipe()?;
 
     //let c = stdout_a.into_std().try_clone()?;
 
@@ -51,9 +59,14 @@ async fn test1() -> Result<(), failure::Error> {
     command.stdout(stdout);
     let stderr = unsafe { std::process::Stdio::from_raw_fd(stderr_a.as_raw_fd()) };
     command.stderr(stderr);
- 
+
+    //let dup_stdin = os_pipe::dup_stdin()?;
+    //command.stdin(dup_stdin);
     command.stdin(slave.fd.as_stdio()?);
+    //command.stdin(master.fd.as_stdio()?);
     //command.stdin(Stdio::null());
+    //command.stdin(Stdio::piped());
+    //command.stdin(Stdio::inherit());
     //let mut reader = master.try_clone_reader()?;
     //let reader = slave.fd.try_clone()?.as_stdio()?;
     //command.stdin(reader);
@@ -72,11 +85,13 @@ async fn test1() -> Result<(), failure::Error> {
     //let stdout = child.stdout.take().unwrap();
     //let stderr = child.stderr.take().unwrap();
 
-    //let mut framed_stdin = codec::FramedWrite::new(slave.fd, codec::BytesCodec::new());
-    let mut framed_stdin = codec::FramedWrite::new(stdin_b, codec::BytesCodec::new());
+    //let mut framed_stdin = codec::FramedWrite::new(master.fd, codec::BytesCodec::new());
+    //let mut framed_stdin = codec::FramedWrite::new(stdin_b, codec::BytesCodec::new());
     //let mut framed_stdout = codec::FramedRead::new(slave.fd, codec::BytesCodec::new());
     let mut framed_stdout = codec::FramedRead::new(stdout_b, codec::BytesCodec::new());
     let mut framed_stderr = codec::FramedRead::new(stderr_b, codec::BytesCodec::new());
+
+    //framed_stdin.send(bytes::Bytes::from("asdf\n\n")).await;
 
     loop {
         tokio::select! {

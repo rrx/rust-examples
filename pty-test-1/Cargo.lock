@@ -615,6 +615,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da32515d9f6e6e489d7bc9d84c71b060db7247dc035bbe44eac88cf87486d8d5"
 
 [[package]]
+name = "os_pipe"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0e3492ebca331b895fe23ed427dce2013d9b2e00c45964f12040b0db38b8ab27"
+dependencies = [
+ "libc",
+ "winapi 0.3.9",
+]
+
+[[package]]
 name = "parking_lot"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -710,6 +720,7 @@ dependencies = [
 name = "pty_test"
 version = "0.1.0"
 dependencies = [
+ "bytes 1.1.0",
  "env_logger",
  "failure",
  "filedescriptor",
@@ -718,6 +729,7 @@ dependencies = [
  "io-lifetimes",
  "libc",
  "log",
+ "os_pipe",
  "rustix",
  "serde",
  "socketpair",

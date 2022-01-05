@@ -29,7 +29,7 @@ async fn test1() -> Result<(), failure::Error> {
     //};
 
     //let file = tokio_file_unix::File::new_nb(fd.as_raw_fd())?;//master.fd.as_raw_fd());
-    let mut command = tokio::process::Command::new("tty");
+    let mut command = tokio::process::Command::new("top");
 
     let (stdout_a, stdout_b) = socketpair::tokio_socketpair_stream().await?;
     let (stderr_a, stderr_b) = socketpair::tokio_socketpair_stream().await?;
@@ -42,11 +42,11 @@ async fn test1() -> Result<(), failure::Error> {
     let stdout = unsafe { std::process::Stdio::from_raw_fd(stdout_a.as_raw_fd()) };
     command.stdout(stdout);
     let stderr = unsafe { std::process::Stdio::from_raw_fd(stderr_a.as_raw_fd()) };
-    //command.stderr(stderr);
+    command.stderr(stderr);
  
     command.stdin(slave.fd.try_clone()?.as_stdio()?);
     //command.stdout(slave.fd.try_clone()?.as_stdio()?);
-    command.stderr(slave.fd.try_clone()?.as_stdio()?);
+    //command.stderr(slave.fd.try_clone()?.as_stdio()?);
 
     let mut child = slave.spawn_command(command)?;
     drop(slave);
@@ -63,6 +63,17 @@ async fn test1() -> Result<(), failure::Error> {
     let mut framed_stdout = codec::FramedRead::new(stdout_b, codec::BytesCodec::new());
     let mut framed_stderr = codec::FramedRead::new(stderr_b, codec::BytesCodec::new());
 
+    loop {
+        tokio::select! {
+            x = framed_stdout.try_next() => {
+                match x {
+                    Ok(None) => break,
+                    Ok(v) => println!("{:?}", v),
+                    Err(e) => println!("{:?}", e)
+                }
+            }
+        }
+    }
     //let x = framed_stdout.try_next().await?;
     //println!("{:?}", x);
 

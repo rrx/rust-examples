@@ -1,0 +1,15 @@
+[package]
+name = "pty-test-2"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+duct = "0.13"
+failure = "0.1"
+env_logger = { version = "0.9" }
+log = "0.4"
+libc = "0.2"
+filedescriptor = { git = "https://github.com/wez/wezterm.git", branch = "main", package = "filedescriptor" }
+

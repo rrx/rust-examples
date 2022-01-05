@@ -20,3 +20,5 @@ io-extras = "0.12.0"
 io-lifetimes = { version = "0.4.0", default-features = false }
 rustix = "0.31.0"
 socketpair = { version = "0.13", features = ["use_tokio"] }
+env_logger = { version = "0.9" }
+log = "0.4"

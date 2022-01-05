@@ -23,13 +23,19 @@ async fn test1() -> Result<(), failure::Error> {
     //let mut reader = master.try_clone_reader()?;
     let mut reader1 = PtyFd::from_fd(master.fd.try_clone()?)?;
     let mut reader2 = PtyFd::from_fd(slave.fd.try_clone()?)?;
-    //
-    //let fd = unsafe {
-        //std::fs::File::from_raw_fd(reader.as_raw_fd())
-    //};
+
+    let mut argv = std::env::args().collect::<Vec<_>>();
+    let mut part1 = argv.split_off(1);
+    let args = part1.split_off(1);
+    let cmd = part1.get(0).unwrap();
+    log::info!("{:?}", (&cmd,&args));
+
+    //tokio::spawn(Process::run_pty(cmd.get(0).unwrap().into(), args, app_tx, process_rx));
 
     //let file = tokio_file_unix::File::new_nb(fd.as_raw_fd())?;//master.fd.as_raw_fd());
-    let mut command = tokio::process::Command::new("top");
+
+    let mut command = tokio::process::Command::new(cmd);
+    command.args(args);
 
     let (stdout_a, stdout_b) = socketpair::tokio_socketpair_stream().await?;
     let (stderr_a, stderr_b) = socketpair::tokio_socketpair_stream().await?;
@@ -45,6 +51,10 @@ async fn test1() -> Result<(), failure::Error> {
     command.stderr(stderr);
  
     command.stdin(slave.fd.try_clone()?.as_stdio()?);
+    //let reader = slave.fd.try_clone()?.as_stdio()?;
+    //command.stdin(reader);
+    //let status = child.wait().await?;
+    //let status = child.wait().await?;
     //command.stdout(slave.fd.try_clone()?.as_stdio()?);
     //command.stderr(slave.fd.try_clone()?.as_stdio()?);
 
@@ -68,25 +78,19 @@ async fn test1() -> Result<(), failure::Error> {
             x = framed_stdout.try_next() => {
                 match x {
                     Ok(None) => break,
-                    Ok(v) => println!("{:?}", v),
-                    Err(e) => println!("{:?}", e)
+                    Ok(Some(v)) => print!("{:?}", v),
+                    Err(e) => print!("{:?}", e),
+                    _ => ()
+
                 }
             }
+            //status = child.wait() => {
+                //log::info!("child status: {:?}", status);
+                //break
+            //}
         }
     }
-    //let x = framed_stdout.try_next().await?;
-    //println!("{:?}", x);
 
-    //let mut r = FramedRead::new(Pin::new(reader), BytesCodec::new());
-    //let mut s = String::new();
-    //reader.read_to_string(&mut s)?;
-    //print!("output: ");
-    //for c in s.escape_debug() {
-        //print!("{}", c);
-    //}
-    //print!("\n");
-    let status = child.wait().await?;
-    println!("child status: {:?}", status);
     Ok(())
 }
 
@@ -131,6 +135,8 @@ async fn test2() -> Result<(), failure::Error> {
 }
 
 fn main() -> Result<(), failure::Error> {
+    env_logger::init();
+
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()

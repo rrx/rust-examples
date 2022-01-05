@@ -1,0 +1,22 @@
+[package]
+name = "pty_test"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+#portable-pty = { git = "https://github.com/wez/wezterm.git", branch = "main", package = "portable-pty" }
+filedescriptor = { git = "https://github.com/wez/wezterm.git", branch = "main", package = "filedescriptor" }
+failure = "0.1"
+tokio = { version = "1.15.0", features = ["full"] }
+tokio-serde = { version = "0.8", features = ["cbor"] }
+tokio-util = { version = "0.6.9", features = ["full"] }
+futures = "0.3"
+libc = "0.2"
+tokio-file-unix = "0.5"
+serde = { version = "1", features = ["derive"] }
+io-extras = "0.12.0"
+io-lifetimes = { version = "0.4.0", default-features = false }
+rustix = "0.31.0"
+socketpair = { version = "0.13", features = ["use_tokio"] }

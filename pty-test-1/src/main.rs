@@ -20,7 +20,7 @@ enum Message {
 
 async fn test1() -> Result<(), failure::Error> {
     use pty_test::test::*;
-    let (mut master, slave) = openpty(PtySize::default())?;
+    let (mut master, mut slave) = openpty(PtySize::default())?;
 
     // these need to stick around for some reason
     //let mut reader1 = PtyFd::from_fd(master.fd.try_clone()?)?;
@@ -75,11 +75,11 @@ async fn test1() -> Result<(), failure::Error> {
     //command.stdin(reader);
     //let status = child.wait().await?;
     //let status = child.wait().await?;
-    command.stdout(slave.fd.as_stdio()?);
-    command.stderr(slave.fd.as_stdio()?);
+    //command.stdout(slave.fd.as_stdio()?);
+    //command.stderr(slave.fd.as_stdio()?);
 
     let mut child = slave.spawn_command(command)?;
-    //drop(slave);
+    drop(slave);
     //drop(master);
 
     println!("{:?}", child);
@@ -90,21 +90,31 @@ async fn test1() -> Result<(), failure::Error> {
 
     //let r = tokio::io::AsyncReadExt::read(&mut master.fd, &mut buffer[..]).await;
 
-    // This writes synchronously
+    // This writes synchronously, and it works
     let xy = std::io::Write::write(&mut master.fd, b"asdf\n");
     println!("xy {:?}", (xy));
     std::io::Write::flush(&mut master.fd);
 
-    let xx = std::io::Write::write(&mut master.fd, b"asdf\n");
-    println!("xx {:?}", (xx));
+    // This writes async, and it seems to work, but it's just reading back what we sent
+    for i in 0..10 {
+        let xx = tokio::io::AsyncWriteExt::write(&mut master.fd, b"xxxx\n").await;
+        println!("xx {:?}", (xx));
+    }
+    //std::io::Write::flush(&mut master.fd);
     std::io::Write::flush(&mut master.fd);
 
-    // we are able to read like this, but it's sync
-    let mut buffer = [0;100];
-    if let Ok(r) = std::io::Read::read(&mut master.fd, &mut buffer[..]) {
-        println!("r{:?}", (r, &buffer[..r]));
+     //we are able to read like this, but it's sync
+    let mut buffer = [0;10];
+    for i in 0..3 {
+        if let Ok(r) = std::io::Read::read(&mut master.fd, &mut buffer[..]) {
+            println!("r{:?}", (r, &buffer[..r]));
+        }
     }
-                 
+    
+     //when we try to read async, we don't get anything
+    if let Ok(r) = tokio::io::AsyncReadExt::read(&mut master.fd, &mut buffer[..]).await {
+        println!("async read {:?}", (r, &buffer[..r]));
+    }
     
     //let mut framed_stdin = codec::FramedWrite::new(other.as_stdio()?, codec::BytesCodec::new());
     let mut framed_stdin = codec::FramedWrite::new(stdin_b, codec::BytesCodec::new());
@@ -119,6 +129,7 @@ async fn test1() -> Result<(), failure::Error> {
         tokio::select! {
             x = framed_stdout.try_next() => {
                 match x {
+                    // break on EOF
                     Ok(None) => break,
                     Ok(Some(v)) => print!("{:?}", v),
                     Err(e) => print!("{:?}", e),
@@ -136,12 +147,10 @@ async fn test1() -> Result<(), failure::Error> {
 
                 }
             }
-            // break out if wait returns
+            // check for wait
             r = child.wait() => {
                 if let Ok(status) = r {
-                    //stdout_a.flush();
                     log::info!("child status: {:?}", (status.success(), status.code(), status));
-                    //break
                 }
             }
         }

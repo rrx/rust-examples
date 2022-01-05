@@ -291,6 +291,7 @@ pub fn openpty(size: PtySize) -> Result<(UnixMasterPty, UnixSlavePty), failure::
     let master = UnixMasterPty {
         fd: PtyFd::from_raw_fd(master)?
     };
+
     let slave = UnixSlavePty {
         fd: PtyFd::from_raw_fd(slave)?
     };

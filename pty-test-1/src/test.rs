@@ -81,11 +81,13 @@ impl std::ops::Deref for PtyFd {
         &self.fd
     }
 }
+
 impl std::ops::DerefMut for PtyFd {
     fn deref_mut(&mut self) -> &mut FileDescriptor {
         &mut self.fd
     }
 }
+
 impl PtyFd {
     pub fn from_fd(fd: FileDescriptor) -> Result<Self, failure::Error> {
         let mut std = unsafe {std::os::unix::net::UnixStream::from_raw_fd(fd.as_raw_fd()) };
@@ -156,9 +158,9 @@ impl PtyFd {
         // them) and won't work in the usual way anyway.
         // In practice these are None, but it seems best to be move them
         // out in case the behavior of Command changes in the future.
-        //child.stdin.take();
-        //child.stdout.take();
-        //child.stderr.take();
+        child.stdin.take();
+        child.stdout.take();
+        child.stderr.take();
 
         Ok(child)
     }

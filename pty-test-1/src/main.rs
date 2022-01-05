@@ -10,6 +10,7 @@ use std::os::unix::io::AsRawFd;
 use std::os::unix::prelude::RawFd;
 use std::io;
 use std::os::unix::process::CommandExt;
+use std::process::Stdio;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 enum Message {
@@ -20,9 +21,10 @@ enum Message {
 async fn test1() -> Result<(), failure::Error> {
     use pty_test::test::*;
     let (master, slave) = openpty(PtySize::default())?;
-    //let mut reader = master.try_clone_reader()?;
+
+    // these need to stick around for some reason
     let mut reader1 = PtyFd::from_fd(master.fd.try_clone()?)?;
-    let mut reader2 = PtyFd::from_fd(slave.fd.try_clone()?)?;
+    //let mut reader2 = PtyFd::from_fd(slave.fd.try_clone()?)?;
 
     let mut argv = std::env::args().collect::<Vec<_>>();
     let mut part1 = argv.split_off(1);
@@ -51,6 +53,8 @@ async fn test1() -> Result<(), failure::Error> {
     command.stderr(stderr);
  
     command.stdin(slave.fd.try_clone()?.as_stdio()?);
+    //command.stdin(Stdio::inherit());
+    //let mut reader = master.try_clone_reader()?;
     //let reader = slave.fd.try_clone()?.as_stdio()?;
     //command.stdin(reader);
     //let status = child.wait().await?;
@@ -59,16 +63,15 @@ async fn test1() -> Result<(), failure::Error> {
     //command.stderr(slave.fd.try_clone()?.as_stdio()?);
 
     let mut child = slave.spawn_command(command)?;
-    drop(slave);
-    drop(master);
+    //drop(slave);
+    //drop(master);
 
     println!("{:?}", child);
-    println!("{:?}", reader2);
+    //println!("{:?}", reader2);
     //let stdin = child.stdin.take().unwrap();
     //let stdout = child.stdout.take().unwrap();
     //let stderr = child.stderr.take().unwrap();
 
-    //let mut framed = codec::FramedRead::new(stdout, codec::LinesCodec::new());
     let mut framed_stdin = codec::FramedRead::new(stdin_b, codec::BytesCodec::new());
     let mut framed_stdout = codec::FramedRead::new(stdout_b, codec::BytesCodec::new());
     let mut framed_stderr = codec::FramedRead::new(stderr_b, codec::BytesCodec::new());
@@ -77,17 +80,17 @@ async fn test1() -> Result<(), failure::Error> {
         tokio::select! {
             x = framed_stdout.try_next() => {
                 match x {
-                    Ok(None) => break,
+                    Ok(None) => (),
                     Ok(Some(v)) => print!("{:?}", v),
                     Err(e) => print!("{:?}", e),
                     _ => ()
 
                 }
             }
-            //status = child.wait() => {
-                //log::info!("child status: {:?}", status);
-                //break
-            //}
+            status = child.wait() => {
+                log::info!("child status: {:?}", status);
+                break
+            }
         }
     }
 

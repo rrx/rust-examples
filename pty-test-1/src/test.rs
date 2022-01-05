@@ -13,7 +13,7 @@ use std::io::IoSlice;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::io::{self, AsyncRead, AsyncWrite, ReadBuf};
-
+use failure::ResultExt;
 /// Represents the size of the visible display area in the pty
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
@@ -91,7 +91,11 @@ impl std::ops::DerefMut for PtyFd {
 impl PtyFd {
     pub fn from_fd(fd: FileDescriptor) -> Result<Self, failure::Error> {
         let mut std = unsafe {std::os::unix::net::UnixStream::from_raw_fd(fd.as_raw_fd()) };
-        std.set_nonblocking(true)?;
+
+        // make sure we are blocking, or pty won't work
+        // applications assume blocking
+        std.set_nonblocking(false)?;
+
         let mut stream = tokio::net::UnixStream::from_std(std)?;
         Ok(Self { fd, stream })
     }
@@ -99,7 +103,11 @@ impl PtyFd {
     pub fn from_raw_fd(raw_fd: RawFd) -> Result<Self, failure::Error> {
         let fd = unsafe {FileDescriptor::from_raw_fd(raw_fd)};
         let mut std = unsafe {std::os::unix::net::UnixStream::from_raw_fd(raw_fd)};
-        std.set_nonblocking(true)?;
+
+        // make sure we are blocking, or pty won't work
+        // applications assume blocking
+        std.set_nonblocking(false)?;
+
         let mut stream = tokio::net::UnixStream::from_std(std)?;
         Ok(Self { fd, stream })
     }
@@ -118,11 +126,12 @@ impl PtyFd {
                         libc::SIGTERM,
                         libc::SIGALRM,
                     ] {
-                        //libc::signal(*signo, libc::SIG_DFL);
+                        libc::signal(*signo, libc::SIG_DFL);
                     }
 
                     // Establish ourselves as a session leader.
                     if libc::setsid() == -1 {
+                        log::error!("Unable to set SID");
                         return Err(io::Error::last_os_error());
                     }
 
@@ -137,11 +146,12 @@ impl PtyFd {
                         // SIGWINCH won't happen when we resize the
                         // terminal, among other undesirable effects.
                         if libc::ioctl(0, libc::TIOCSCTTY as _, 0) == -1 {
+                            log::error!("Unable to set TTY");
                             return Err(io::Error::last_os_error());
                         }
                     }
 
-                    //close_random_fds();
+                    close_random_fds();
 
                     //if let Some(mask) = configured_umask {
                         //libc::umask(mask);

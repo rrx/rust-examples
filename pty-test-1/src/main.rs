@@ -20,7 +20,7 @@ enum Message {
 
 async fn test1() -> Result<(), failure::Error> {
     use pty_test::test::*;
-    let (master, slave) = openpty(PtySize::default())?;
+    let (mut master, slave) = openpty(PtySize::default())?;
 
     // these need to stick around for some reason
     //let mut reader1 = PtyFd::from_fd(master.fd.try_clone()?)?;
@@ -41,27 +41,30 @@ async fn test1() -> Result<(), failure::Error> {
 
     let (mut stdout_a, stdout_b) = socketpair::tokio_socketpair_stream().await?;
     let (stderr_a, stderr_b) = socketpair::tokio_socketpair_stream().await?;
-    //let (stdin_a, stdin_b) = socketpair::tokio_socketpair_stream().await?;
+    let (stdin_a, stdin_b) = socketpair::tokio_socketpair_stream().await?;
     //let (stdin_a, stdin_b) = tokio::io::duplex(100);
     //let (stdin_a, stdin_b) = std::os::unix::net::UnixStream::pair()?;
+    //let (stdin_a, stdin_b) = os_pipe::pipe()?;
     //stdin_a.set_nonblocking(false);
     //stdin_b.set_nonblocking(false);
-    let (stdin_a, stdin_b) = os_pipe::pipe()?;
-
     //let c = stdout_a.into_std().try_clone()?;
 
     //let stdin = slave.fd.as_stdio()?;
     //println!("x{:?}", stdin);
     let stdin = unsafe { std::process::Stdio::from_raw_fd(stdin_a.as_raw_fd()) };
     let stdin_a = unsafe { std::process::Stdio::from_raw_fd(stdin_a.as_raw_fd()) };
-    //command.stdin(stdin);
+    command.stdin(stdin);
     let stdout = unsafe { std::process::Stdio::from_raw_fd(stdout_a.as_raw_fd()) };
     command.stdout(stdout);
     let stderr = unsafe { std::process::Stdio::from_raw_fd(stderr_a.as_raw_fd()) };
     command.stderr(stderr);
 
+    //let master_stdout = unsafe { std::process::Stdio::from_raw_fd(master.fd.as_raw_fd()) };
+
     //let dup_stdin = os_pipe::dup_stdin()?;
     //command.stdin(dup_stdin);
+    //let other = slave.fd.try_clone()?;
+
     command.stdin(slave.fd.as_stdio()?);
     //command.stdin(master.fd.as_stdio()?);
     //command.stdin(Stdio::null());
@@ -72,8 +75,8 @@ async fn test1() -> Result<(), failure::Error> {
     //command.stdin(reader);
     //let status = child.wait().await?;
     //let status = child.wait().await?;
-    //command.stdout(slave.fd.try_clone()?.as_stdio()?);
-    //command.stderr(slave.fd.try_clone()?.as_stdio()?);
+    command.stdout(slave.fd.as_stdio()?);
+    command.stderr(slave.fd.as_stdio()?);
 
     let mut child = slave.spawn_command(command)?;
     //drop(slave);
@@ -85,13 +88,32 @@ async fn test1() -> Result<(), failure::Error> {
     //let stdout = child.stdout.take().unwrap();
     //let stderr = child.stderr.take().unwrap();
 
-    //let mut framed_stdin = codec::FramedWrite::new(master.fd, codec::BytesCodec::new());
-    //let mut framed_stdin = codec::FramedWrite::new(stdin_b, codec::BytesCodec::new());
+    //let r = tokio::io::AsyncReadExt::read(&mut master.fd, &mut buffer[..]).await;
+
+    // This writes synchronously
+    let xy = std::io::Write::write(&mut master.fd, b"asdf\n");
+    println!("xy {:?}", (xy));
+    std::io::Write::flush(&mut master.fd);
+
+    let xx = std::io::Write::write(&mut master.fd, b"asdf\n");
+    println!("xx {:?}", (xx));
+    std::io::Write::flush(&mut master.fd);
+
+    // we are able to read like this, but it's sync
+    let mut buffer = [0;100];
+    if let Ok(r) = std::io::Read::read(&mut master.fd, &mut buffer[..]) {
+        println!("r{:?}", (r, &buffer[..r]));
+    }
+                 
+    
+    //let mut framed_stdin = codec::FramedWrite::new(other.as_stdio()?, codec::BytesCodec::new());
+    let mut framed_stdin = codec::FramedWrite::new(stdin_b, codec::BytesCodec::new());
     //let mut framed_stdout = codec::FramedRead::new(slave.fd, codec::BytesCodec::new());
     let mut framed_stdout = codec::FramedRead::new(stdout_b, codec::BytesCodec::new());
+    //let mut framed_stdout = codec::FramedRead::new(master_stdout, codec::BytesCodec::new());
     let mut framed_stderr = codec::FramedRead::new(stderr_b, codec::BytesCodec::new());
 
-    //framed_stdin.send(bytes::Bytes::from("asdf\n\n")).await;
+    framed_stdin.send(bytes::Bytes::from("asdf\n\n")).await;
 
     loop {
         tokio::select! {

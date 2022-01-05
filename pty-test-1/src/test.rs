@@ -203,6 +203,16 @@ impl AsyncRead for PtyFd {
     }
 }
 
+impl Write for PtyFd {
+    fn write(&mut self, bytes: &[u8]) -> Result<usize, io::Error> {
+        self.fd.write(bytes)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.fd.flush()
+    }
+}
+
 impl AsyncWrite for PtyFd {
     #[inline]
     fn poll_write(

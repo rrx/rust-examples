@@ -1,7 +1,5 @@
 use futures::prelude::*;
 use std::io::{Read, Write};
-use mio::{Poll, Interest, Token, Events, Registry, event};
-use mio::unix::SourceFd;
 use std::io;
 use std::os::unix::io::{RawFd, AsRawFd};
 use tokio::io::AsyncReadExt;
@@ -13,28 +11,6 @@ use serde::{Serialize, Deserialize};
 enum Message {
     Ok,
     Terminate
-}
-
-pub struct MyIo {
-    fd: RawFd,
-}
-
-impl event::Source for MyIo {
-    fn register(&mut self, registry: &Registry, token: Token, interests: Interest)
-        -> io::Result<()>
-    {
-        SourceFd(&self.fd).register(registry, token, interests)
-    }
-
-    fn reregister(&mut self, registry: &Registry, token: Token, interests: Interest)
-        -> io::Result<()>
-    {
-        SourceFd(&self.fd).reregister(registry, token, interests)
-    }
-
-    fn deregister(&mut self, registry: &Registry) -> io::Result<()> {
-        SourceFd(&self.fd).deregister(registry)
-    }
 }
 
 fn main() -> Result<(), failure::Error> {

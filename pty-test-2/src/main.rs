@@ -5,6 +5,9 @@ use std::os::unix::io::AsRawFd;
 use std::ptr;
 use filedescriptor::FileDescriptor;
 use std::ffi::OsString;
+use std::os::unix::process::CommandExt;
+use pty_test_2::*;
+
 
 fn md5sum() -> Result<(), failure::Error> {
     let h = duct::cmd!("md5sum")
@@ -32,15 +35,8 @@ fn do_pty(program: String) -> Result<(), failure::Error> {
     log::info!("p: {}", program);
     let size = PtySize::default();
     let (master, slave) = openpty(size)?;
-    //let m = unsafe { std::process::Stdio::from_raw_fd(master) };
-    //let s = unsafe { std::process::Stdio::from_raw_fd(slave) };
 
-    // Set the pty as the controlling terminal.
-    // Failure to do this means that delivery of
-    // SIGWINCH won't happen when we resize the
-    // terminal, among other undesirable effects.
-
-    let e = duct::cmd!(program)//"tty")//"cat", "Cargo.lock")
+    let e = duct::cmd!(program)
         .stdin_bytes(&b"asdf\n"[..])
         .stdin_file(slave.try_clone()?)
         .stdout_file(slave.try_clone()?)
@@ -62,7 +58,7 @@ fn do_pty(program: String) -> Result<(), failure::Error> {
             Ok(())
         });
 
-    let mut h = e.reader()?;
+    let mut h = e.start()?;//reader()?;
 
     let pids = h.pids();
     println!("pids {:?}", pids);
@@ -71,31 +67,123 @@ fn do_pty(program: String) -> Result<(), failure::Error> {
     let mut f = unsafe { std::fs::File::from_raw_fd(master.as_raw_fd()) };
     //f.set_nonblocking(true);
     let mut buffer = [0;100];
-
-    //let mut b = std::io::Read::bytes(&mut f);
     let mut s = String::new();
     loop {
-        let r = h.read_to_string(&mut s)?;
-        if r > 0 {
-            println!("{:?}", r);
+        //let r = f.read_to_string(&mut s)?;
+        //println!("{:?}", r);
+        let n = f.read(&mut buffer)?;
+        println!("{:?}", (n, &buffer[..n]));
 
-            if s.len() > 0 {
-                println!("{:?}", s);
+        match h.try_wait() {
+            Ok(Some(o)) => {
+                log::info!("child status: {:?}", (o.status.success(), o.status.code(), o.status));
+                break;
             }
+            Ok(None) => {
+                println!("continue");
+                continue;
+            }
+            _ => break
         }
-        //match b.next() {
-            //Some(v) => println!("{:?}", v),
-            //None => break
-        //}
-        //match std::io::Read::read(&mut f, &mut buffer[..]) {
-            //Ok(r) => println!("r{:?}", (r, &buffer[..r])),
-            //Err(e) => break
-        //}
     }
+
+    //let mut b = std::io::Read::bytes(&mut f);
+    //println!("{:?}", buffer);
+    //let o = h.wait()?;
+    //log::info!("child status: {:?}", (o.status.success(), o.status.code(), o.status));
+    //let mut b = std::io::Read::bytes(&mut f);
+    //println!("{:?}", buffer);
+
+    //let mut s = String::new();
+    //loop {
+        //let r = h.read_to_string(&mut s)?;
+        //if r > 0 {
+            //println!("{:?}", r);
+
+            //if s.len() > 0 {
+                //println!("{:?}", s);
+            //}
+        //}
+        ////match b.next() {
+            ////Some(v) => println!("{:?}", v),
+            ////None => break
+        ////}
+        ////match std::io::Read::read(&mut f, &mut buffer[..]) {
+            ////Ok(r) => println!("r{:?}", (r, &buffer[..r])),
+            ////Err(e) => break
+        ////}
+    //}
 
     //let o = h.wait()?;
     //println!("{:?}", (o.status.success(), o.status.code()));
 
+    Ok(())
+}
+
+fn test_mio(program: String) -> Result<(), failure::Error> {
+    log::info!("mio: {}", program);
+    let size = PtySize::default();
+    let (mut master, slave) = openpty(size)?;
+
+    let e = duct::cmd!(program)
+        //.stdin_bytes(&b"asdf\n"[..])
+        .stdin_file(slave.try_clone()?)
+        .stdout_file(slave.try_clone()?)
+        .stderr_file(slave)
+        .unchecked();
+
+    let mut h = e.start()?;
+
+    let pids = h.pids();
+    println!("pids {:?}", pids);
+    use mio::{Events, Token, Poll, Interest};
+
+    let mut poll = Poll::new()?;
+    let mut events = Events::with_capacity(1024);
+
+
+    poll.registry().register(
+        &mut mio::unix::SourceFd(&master.as_raw_fd()),
+        Token(0), Interest::READABLE | Interest::WRITABLE)?;
+
+    poll.poll(&mut events, Some(std::time::Duration::from_millis(100)))?;
+    use std::io::{Write, Read};
+
+    //writeln!(master, "hello")?;
+
+    let mut buf = String::new();
+    'outer: loop {
+        for x in events.iter() {
+            match x.token() {
+                Token(0) if x.is_readable() => {
+                    master.read_to_string(&mut buf)?;
+                    println!("read {:?}", (buf));
+                }
+                _ => {
+                    println!("{:?}", (x.token(), x.is_readable(), x.is_writable()));
+                }
+            }
+
+            println!("event {:?}", (x.token()));
+            match h.try_wait() {
+                Ok(Some(o)) => {
+                    println!("o {:?}", (o));
+                    break 'outer;
+                }
+                Ok(None) => {
+                }
+                Err(e) => {
+                    println!("e {:?}", (e));
+                    break 'outer;
+                }
+            }
+
+        }
+    }
+
+    let o = h.wait()?;
+    println!("exit {:?}", (o.status.success(), o.status.code(), o));
+    
     Ok(())
 }
 
@@ -164,8 +252,9 @@ fn main() -> Result<(), failure::Error> {
     env_logger::init();
     md5sum()?;
     cat()?;
-    //do_pty("cat".into())?;//, &mut vec![])?;
+    test_mio("ls".into())?;
     do_pty("tty".into())?;//, &mut vec![])?;
-    do_pty("top".into())?;//, &mut vec![])?;
+    //do_pty("top".into())?;//, &mut vec![])?;
+    //do_pty("cat".into())?;//, &mut vec![])?;
     Ok(())
 }

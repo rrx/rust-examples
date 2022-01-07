@@ -114,31 +114,18 @@ fn main() -> Result<(), failure::Error> {
     // for termination signalling
     let term = Arc::new(AtomicBool::new(false));
 
-
     signal_hook::flag::register(signal_hook::consts::SIGTERM, Arc::clone(&term))?;
     signal_hook::flag::register(signal_hook::consts::SIGINT, Arc::clone(&term))?;
     signal_hook::flag::register(signal_hook::consts::SIGHUP, Arc::clone(&term))?;
 
-    //let mut children = Rc::new(Mutex::new(std::collections::HashMap::new()));
-    //let mut children = Rc::new(std::collections::HashMap::new());
     let mut children = std::collections::HashMap::new();
-    //
-
 
     for i in 0..100 {
         let p = Process::new("sleep 1").unwrap();
-        //let mut child = std::process::Command::new("sleep").args(vec!["1"]).spawn()?;
-        //let child_id = ulid::Ulid::new();
-        //Rc::get_mut(&mut children).unwrap().insert(child_id, child).unwrap();
         children.insert(p.id, p);
     }
 
     while !term.load(Ordering::Relaxed) {
-        // Do some time-limited stuff here
-        // (if this could block forever, then there's no guarantee the signal will have any
-        // effect).
-        //let mut reap = vec![];
-        //let mut c = Rc::get_mut(&mut children).unwrap();
         let mut c = &mut children;
         c.drain_filter(|id, p| {
             match p.child.try_wait() {
@@ -158,7 +145,6 @@ fn main() -> Result<(), failure::Error> {
         });
         std::thread::sleep(std::time::Duration::from_millis(200));
     }
-
 
     // on exit, send kill, then wait to reap the child
     children.iter_mut().for_each(|(id, p)| {

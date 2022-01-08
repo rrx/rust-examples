@@ -3,6 +3,7 @@ use std::io::Read;
 use std::process::{Command};
 use std::io::BufRead;
 use pty::fork::*;
+use std::io::Write;
 
 fn main() {
   let fork = Fork::from_ptmx().unwrap();
@@ -11,22 +12,21 @@ fn main() {
     // Read output via PTY master
     let mut output = String::new();
     let mut buffer = [0; 10];
+    master.write(b"asdf\n");
+    master.write(b"fdsa");
+    master.flush();
     loop {
         let r = master.read(&mut buffer).unwrap();
         if r == 0 {
             break;
         }
-        //println!("a:{:?}", (r, &buffer[..r]));
+
         if let Ok(v) = utf8::decode(&buffer[..r]) {
             print!("{}", v);
+        } else {
+            print!("a{:?}", &buffer[..r]);
         }
-
-        //match master.read_to_string(&mut output) {
-          //Ok(_nread) => println!("child tty is: {}", output.trim()),
-          //Err(e)     => panic!("read error: {}", e),
-        //}
     }
-
   }
   else {
       let mut args = std::env::args().collect::<Vec<String>>();

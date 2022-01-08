@@ -16,3 +16,5 @@ clap = { version = "3.0", features = ["cargo"] }
 ulid = "0.5"
 im = "15.0"
 shlex = "1.1"
+portable-pty = { git = "https://github.com/wez/wezterm.git", branch = "main", package = "portable-pty" }
+rexpect = "0.4"
